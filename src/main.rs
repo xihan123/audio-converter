@@ -253,14 +253,13 @@ impl eframe::App for AudioConverterApp {
                 ui.horizontal(|ui| {
                     ui.label("输出目录:");
                     ui.label(self.output_dir.to_string_lossy());
-                    if ui.button("更改输出目录").clicked() {
-                        if let Some(dir) = rfd::FileDialog::new()
+                    if ui.button("更改输出目录").clicked()
+                        && let Some(dir) = rfd::FileDialog::new()
                             .set_directory(&self.output_dir)
                             .pick_folder()
                         {
                             self.output_dir = dir;
                         }
-                    }
                     if ui.button("重置为默认").clicked() {
                         self.output_dir = std::env::current_exe()
                             .ok()
