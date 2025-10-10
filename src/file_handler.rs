@@ -43,7 +43,7 @@ pub fn find_audio_files(dir: &Path) -> Vec<PathBuf> {
 /// Generate a path for the output WAV placed inside `output_dir`, avoiding overwrite by
 /// adding a numeric suffix if needed. Creates `output_dir` if it doesn't exist.
 pub fn generate_unique_output_path(input_path: &Path, output_dir: &Path) -> PathBuf {
-    if let Err(_) = fs::create_dir_all(output_dir) {
+    if fs::create_dir_all(output_dir).is_err() {
         // If creation fails, fall back to current directory
     }
 
