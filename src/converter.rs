@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 static FFMPEG_PATH: OnceLock<PathBuf> = OnceLock::new();
 static FFPROBE_PATH: OnceLock<PathBuf> = OnceLock::new();
 
@@ -65,17 +68,24 @@ impl AudioConverter {
     /// 获取音频时长(秒)
     fn get_duration(&self, path: &Path) -> Result<f64> {
         let ffprobe_path = self.get_ffprobe_path()?;
-        let output = Command::new(ffprobe_path)
-            .args(&[
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                path.to_str().unwrap(),
-            ])
-            .output()?;
+        let mut cmd = Command::new(ffprobe_path);
+        cmd.args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            path.to_str().unwrap(),
+        ]);
+        
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        
+        let output = cmd.output()?;
 
         if !output.status.success() {
             return Err(anyhow!(
@@ -114,20 +124,27 @@ impl AudioConverter {
     /// 简单转换(不循环)
     fn convert_simple(&self, input: &Path, output: &Path) -> Result<()> {
         let ffmpeg_path = self.get_ffmpeg_path()?;
-        let status = Command::new(ffmpeg_path)
-            .args(&[
-                "-i",
-                input.to_str().unwrap(),
-                "-ar",
-                "44100",
-                "-ac",
-                "2",
-                "-y",
-                output.to_str().unwrap(),
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
+        let mut cmd = Command::new(ffmpeg_path);
+        cmd.args([
+            "-i",
+            input.to_str().unwrap(),
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-y",
+            output.to_str().unwrap(),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        
+        let status = cmd.status()?;
 
         if !status.success() {
             return Err(anyhow!("FFmpeg conversion failed"));
@@ -146,20 +163,27 @@ impl AudioConverter {
             .join("|");
         let concat_input = format!("concat:{}", concat_str);
 
-        let status = Command::new(ffmpeg_path)
-            .args(&[
-                "-i",
-                &concat_input,
-                "-ar",
-                "44100",
-                "-ac",
-                "2",
-                "-y",
-                output.to_str().unwrap(),
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
+        let mut cmd = Command::new(ffmpeg_path);
+        cmd.args([
+            "-i",
+            &concat_input,
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-y",
+            output.to_str().unwrap(),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        
+        let status = cmd.status()?;
 
         if !status.success() {
             // 如果 concat 失败,尝试使用 amovie + loop
@@ -174,20 +198,27 @@ impl AudioConverter {
         let ffmpeg_path = self.get_ffmpeg_path()?;
         let filter = format!("amovie={}:loop={}", input.to_str().unwrap(), loop_count);
 
-        let status = Command::new(ffmpeg_path)
-            .args(&[
-                "-filter_complex",
-                &filter,
-                "-ar",
-                "44100",
-                "-ac",
-                "2",
-                "-y",
-                output.to_str().unwrap(),
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
+        let mut cmd = Command::new(ffmpeg_path);
+        cmd.args([
+            "-filter_complex",
+            &filter,
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-y",
+            output.to_str().unwrap(),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        
+        let status = cmd.status()?;
 
         if !status.success() {
             return Err(anyhow!("FFmpeg conversion with filter failed"));
