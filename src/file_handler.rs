@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -36,4 +37,27 @@ pub fn find_audio_files(dir: &Path) -> Vec<PathBuf> {
         .map(|e| e.path().to_path_buf())
         .filter(|p| is_audio_file(p))
         .collect()
+}
+
+/// Generate a path for the output WAV placed inside `output_dir`, avoiding overwrite by
+/// adding a numeric suffix if needed. Creates `output_dir` if it doesn't exist.
+pub fn generate_unique_output_path(input_path: &Path, output_dir: &Path) -> PathBuf {
+    if let Err(_) = fs::create_dir_all(output_dir) {
+        // If creation fails, fall back to current directory
+    }
+
+    let stem = input_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "output".to_string());
+
+    let mut candidate = output_dir.join(format!("{}.wav", stem));
+    let mut idx = 1;
+
+    while candidate.exists() {
+        candidate = output_dir.join(format!("{} ({}){}.wav", stem, idx, ""));
+        idx += 1;
+    }
+
+    candidate
 }

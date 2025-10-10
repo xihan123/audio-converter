@@ -61,10 +61,17 @@ struct AudioConverterApp {
     concurrent_tasks: usize,
     queue: Arc<Mutex<Vec<FileTask>>>,
     drop_zone_text: String,
+    output_dir: PathBuf,
 }
 
 impl AudioConverterApp {
     fn new() -> Self {
+        // Default output dir: ./output next to the running executable when possible
+        let default_output = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.join("output")))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("output"));
+
         Self {
             converter: Arc::new(Mutex::new(AudioConverter::new())),
             runtime: Arc::new(Runtime::new().unwrap()),
@@ -72,6 +79,7 @@ impl AudioConverterApp {
             concurrent_tasks: 2,
             queue: Arc::new(Mutex::new(Vec::new())),
             drop_zone_text: "拖放文件或文件夹到这里".to_string(),
+            output_dir: default_output,
         }
     }
 
@@ -81,9 +89,11 @@ impl AudioConverterApp {
         for path in paths {
             if path.is_file() {
                 if file_handler::is_audio_file(&path) && !file_handler::is_wav_file(&path) {
+                    // Use the configured output dir and generate a unique filename there
+                    let out = file_handler::generate_unique_output_path(&path, &self.output_dir);
                     queue.push(FileTask {
                         input_path: path.clone(),
-                        output_path: file_handler::get_output_path(&path),
+                        output_path: out,
                         status: TaskStatus::Pending,
                         progress: 0.0,
                         error_message: None,
@@ -93,9 +103,10 @@ impl AudioConverterApp {
                 let files = file_handler::find_audio_files(&path);
                 for file in files {
                     if !file_handler::is_wav_file(&file) {
+                        let out = file_handler::generate_unique_output_path(&file, &self.output_dir);
                         queue.push(FileTask {
                             input_path: file.clone(),
-                            output_path: file_handler::get_output_path(&file),
+                            output_path: out,
                             status: TaskStatus::Pending,
                             progress: 0.0,
                             error_message: None,
@@ -229,6 +240,23 @@ impl eframe::App for AudioConverterApp {
                 ui.horizontal(|ui| {
                     ui.label("并发任务数:");
                     ui.add(egui::Slider::new(&mut self.concurrent_tasks, 1..=8));
+                });
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label("输出目录:");
+                    ui.label(self.output_dir.to_string_lossy());
+                    if ui.button("更改输出目录").clicked() {
+                        if let Some(dir) = rfd::FileDialog::new().set_directory(&self.output_dir).pick_folder() {
+                            self.output_dir = dir;
+                        }
+                    }
+                    if ui.button("重置为默认").clicked() {
+                        self.output_dir = std::env::current_exe()
+                            .ok()
+                            .and_then(|exe| exe.parent().map(|p| p.join("output")))
+                            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("output"));
+                    }
                 });
             });
 
