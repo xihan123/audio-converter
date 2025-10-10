@@ -1,0 +1,40 @@
+# Rust 编译输出
+/target
+Cargo.lock
+
+# IDE 相关
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 临时文件
+*.tmp
+*.log
+*.bak
+
+# FFmpeg 工具（会从 CI 自动下载）
+# 如果需要本地开发，请手动下载这些文件
+# ffmpeg.exe
+# ffprobe.exe
+
+# 测试输出
+test_output/
+temp/
+
+# Windows
+Thumbs.DS_Store
+ehthumbs.db
+Desktop.ini
+
+# 构建产物
+*.exe
+*.pdb
+*.zip
+release-package/
+
+# 环境配置
+.env
+.env.local
