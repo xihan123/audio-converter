@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -19,19 +19,19 @@ impl AudioConverter {
     /// Ensure embedded FFmpeg and FFprobe are extracted to temp directory
     fn ensure_tools_extracted() {
         FFMPEG_PATH.get_or_init(|| {
-            Self::extract_tool("ffmpeg.exe", include_bytes!("../ffmpeg.exe"))
-                .unwrap_or_else(|e| {
-                    eprintln!("Failed to extract ffmpeg.exe: {}", e);
-                    PathBuf::from("ffmpeg.exe")
-                })
+            Self::extract_tool("ffmpeg.exe", include_bytes!("../ffmpeg.exe")).unwrap_or_else(|e| {
+                eprintln!("Failed to extract ffmpeg.exe: {}", e);
+                PathBuf::from("ffmpeg.exe")
+            })
         });
-        
+
         FFPROBE_PATH.get_or_init(|| {
-            Self::extract_tool("ffprobe.exe", include_bytes!("../ffprobe.exe"))
-                .unwrap_or_else(|e| {
+            Self::extract_tool("ffprobe.exe", include_bytes!("../ffprobe.exe")).unwrap_or_else(
+                |e| {
                     eprintln!("Failed to extract ffprobe.exe: {}", e);
                     PathBuf::from("ffprobe.exe")
-                })
+                },
+            )
         });
     }
 
