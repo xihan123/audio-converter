@@ -1,45 +1,71 @@
 use anyhow::{anyhow, Result};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
 
-pub struct AudioConverter {
-    ffmpeg_path: PathBuf,
-    ffprobe_path: PathBuf,
-}
+static FFMPEG_PATH: OnceLock<PathBuf> = OnceLock::new();
+static FFPROBE_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+pub struct AudioConverter;
 
 impl AudioConverter {
     pub fn new() -> Self {
-        // Try to prefer ffmpeg/ffprobe located next to the running executable.
-        // Fall back to the system names (rely on PATH).
-        let mut ffmpeg_name = "ffmpeg".to_string();
-        let mut ffprobe_name = "ffprobe".to_string();
+        // Initialize embedded FFmpeg/FFprobe on first use
+        Self::ensure_tools_extracted();
+        Self
+    }
 
-        #[cfg(target_os = "windows")]
-        {
-            ffmpeg_name.push_str(".exe");
-            ffprobe_name.push_str(".exe");
+    /// Ensure embedded FFmpeg and FFprobe are extracted to temp directory
+    fn ensure_tools_extracted() {
+        FFMPEG_PATH.get_or_init(|| {
+            Self::extract_tool("ffmpeg.exe", include_bytes!("../ffmpeg.exe"))
+                .unwrap_or_else(|e| {
+                    eprintln!("Failed to extract ffmpeg.exe: {}", e);
+                    PathBuf::from("ffmpeg.exe")
+                })
+        });
+        
+        FFPROBE_PATH.get_or_init(|| {
+            Self::extract_tool("ffprobe.exe", include_bytes!("../ffprobe.exe"))
+                .unwrap_or_else(|e| {
+                    eprintln!("Failed to extract ffprobe.exe: {}", e);
+                    PathBuf::from("ffprobe.exe")
+                })
+        });
+    }
+
+    /// Extract a single tool to temp directory
+    fn extract_tool(name: &str, data: &[u8]) -> Result<PathBuf> {
+        let temp_dir = std::env::temp_dir().join("audio_converter_tools");
+        fs::create_dir_all(&temp_dir)?;
+
+        let tool_path = temp_dir.join(name);
+        if !tool_path.exists() || fs::metadata(&tool_path)?.len() != data.len() as u64 {
+            fs::write(&tool_path, data)?;
         }
 
-        let (ffmpeg_path, ffprobe_path) = match std::env::current_exe().ok().and_then(|exe| exe.parent().map(|p| p.to_path_buf())) {
-            Some(mut dir) => {
-                let candidate_ffmpeg = dir.join(&ffmpeg_name);
-                let candidate_ffprobe = dir.join(&ffprobe_name);
-                let ffmpeg_path = if candidate_ffmpeg.exists() { candidate_ffmpeg } else { PathBuf::from(&ffmpeg_name) };
-                let ffprobe_path = if candidate_ffprobe.exists() { candidate_ffprobe } else { PathBuf::from(&ffprobe_name) };
-                (ffmpeg_path, ffprobe_path)
-            }
-            None => (PathBuf::from(&ffmpeg_name), PathBuf::from(&ffprobe_name)),
-        };
+        Ok(tool_path)
+    }
 
-        Self {
-            ffmpeg_path,
-            ffprobe_path,
-        }
+    fn get_ffmpeg_path(&self) -> Result<&Path> {
+        FFMPEG_PATH
+            .get()
+            .map(|p| p.as_path())
+            .ok_or_else(|| anyhow!("FFmpeg not initialized"))
+    }
+
+    fn get_ffprobe_path(&self) -> Result<&Path> {
+        FFPROBE_PATH
+            .get()
+            .map(|p| p.as_path())
+            .ok_or_else(|| anyhow!("FFprobe not initialized"))
     }
 
     /// 获取音频时长(秒)
     fn get_duration(&self, path: &Path) -> Result<f64> {
-        let output = Command::new(&self.ffprobe_path)
+        let ffprobe_path = self.get_ffprobe_path()?;
+        let output = Command::new(ffprobe_path)
             .args(&[
                 "-v",
                 "error",
@@ -69,13 +95,6 @@ impl AudioConverter {
 
     /// 转换音频文件
     pub fn convert_audio(&self, input: &Path, output: &Path, min_duration: f32) -> Result<()> {
-        // 检查 FFmpeg/FFprobe 是否可用
-        if !self.check_ffmpeg() {
-            return Err(anyhow!(
-                "FFmpeg/FFprobe not found. Please install them or place them next to the program."
-            ));
-        }
-
         // 获取原始时长
         let duration = self.get_duration(input)?;
         let min_dur = min_duration as f64;
@@ -94,7 +113,8 @@ impl AudioConverter {
 
     /// 简单转换(不循环)
     fn convert_simple(&self, input: &Path, output: &Path) -> Result<()> {
-        let status = Command::new(&self.ffmpeg_path)
+        let ffmpeg_path = self.get_ffmpeg_path()?;
+        let status = Command::new(ffmpeg_path)
             .args(&[
                 "-i",
                 input.to_str().unwrap(),
@@ -118,8 +138,7 @@ impl AudioConverter {
 
     /// 带循环的转换
     fn convert_with_loop(&self, input: &Path, output: &Path, loop_count: usize) -> Result<()> {
-        // 使用 FFmpeg 的 concat demuxer 或者 amovie filter 作为回退
-        // Build a concat protocol string like: concat:in|in|in
+        let ffmpeg_path = self.get_ffmpeg_path()?;
         let single = input.to_str().unwrap();
         let concat_str = (0..loop_count)
             .map(|_| single)
@@ -127,7 +146,7 @@ impl AudioConverter {
             .join("|");
         let concat_input = format!("concat:{}", concat_str);
 
-        let status = Command::new(&self.ffmpeg_path)
+        let status = Command::new(ffmpeg_path)
             .args(&[
                 "-i",
                 &concat_input,
@@ -152,11 +171,10 @@ impl AudioConverter {
 
     /// 使用 filter 进行循环拼接
     fn convert_with_filter(&self, input: &Path, output: &Path, loop_count: usize) -> Result<()> {
-        // Use amovie with loop; note: some ffmpeg builds may require a different filter chain.
-        // loop_count here is number of repetitions, pass loop_count-1 to amovie's loop param if needed.
+        let ffmpeg_path = self.get_ffmpeg_path()?;
         let filter = format!("amovie={}:loop={}", input.to_str().unwrap(), loop_count);
 
-        let status = Command::new(&self.ffmpeg_path)
+        let status = Command::new(ffmpeg_path)
             .args(&[
                 "-filter_complex",
                 &filter,
@@ -176,26 +194,5 @@ impl AudioConverter {
         }
 
         Ok(())
-    }
-
-    /// 检查 FFmpeg/FFprobe 是否可用
-    fn check_ffmpeg(&self) -> bool {
-        let ffmpeg_ok = Command::new(&self.ffmpeg_path)
-            .arg("-version")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-
-        let ffprobe_ok = Command::new(&self.ffprobe_path)
-            .arg("-version")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-
-        ffmpeg_ok && ffprobe_ok
     }
 }

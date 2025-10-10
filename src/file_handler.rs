@@ -23,6 +23,7 @@ pub fn is_wav_file(path: &Path) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub fn get_output_path(input_path: &Path) -> PathBuf {
     let mut output = input_path.to_path_buf();
     output.set_extension("wav");
