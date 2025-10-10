@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use eframe::egui::{self, FontData, FontDefinitions, FontFamily};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -70,12 +72,16 @@ impl AudioConverterApp {
         let default_output = std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(|p| p.join("output")))
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("output"));
+            .unwrap_or_else(|| {
+                std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .join("output")
+            });
 
         Self {
             converter: Arc::new(Mutex::new(AudioConverter::new())),
             runtime: Arc::new(Runtime::new().unwrap()),
-            min_duration: 10.0,
+            min_duration: 30.0,
             concurrent_tasks: 2,
             queue: Arc::new(Mutex::new(Vec::new())),
             drop_zone_text: "拖放文件或文件夹到这里".to_string(),
@@ -103,7 +109,8 @@ impl AudioConverterApp {
                 let files = file_handler::find_audio_files(&path);
                 for file in files {
                     if !file_handler::is_wav_file(&file) {
-                        let out = file_handler::generate_unique_output_path(&file, &self.output_dir);
+                        let out =
+                            file_handler::generate_unique_output_path(&file, &self.output_dir);
                         queue.push(FileTask {
                             input_path: file.clone(),
                             output_path: out,
@@ -247,7 +254,10 @@ impl eframe::App for AudioConverterApp {
                     ui.label("输出目录:");
                     ui.label(self.output_dir.to_string_lossy());
                     if ui.button("更改输出目录").clicked() {
-                        if let Some(dir) = rfd::FileDialog::new().set_directory(&self.output_dir).pick_folder() {
+                        if let Some(dir) = rfd::FileDialog::new()
+                            .set_directory(&self.output_dir)
+                            .pick_folder()
+                        {
                             self.output_dir = dir;
                         }
                     }
@@ -255,7 +265,11 @@ impl eframe::App for AudioConverterApp {
                         self.output_dir = std::env::current_exe()
                             .ok()
                             .and_then(|exe| exe.parent().map(|p| p.join("output")))
-                            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("output"));
+                            .unwrap_or_else(|| {
+                                std::env::current_dir()
+                                    .unwrap_or_else(|_| PathBuf::from("."))
+                                    .join("output")
+                            });
                     }
                 });
             });
