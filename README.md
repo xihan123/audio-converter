@@ -90,15 +90,16 @@ npm run preview
 ## 🔧 项目结构
 
 ```
-├── src/
-│   ├── components/
-│   │   └── AudioConverter.vue    # 文件转换进度组件
-│   ├── utils/
-│   │   └── audioProcessor.ts     # 音频处理核心逻辑
-│   ├── App.vue                    # 主应用组件
-│   ├── main.ts                    # 应用入口
-│   ├── style.css                  # 全局样式
-│   └── vite-env.d.ts             # TypeScript 类型声明
+
+src/
+├── components/
+└── AudioConverter.vue    # 文件转换进度组件
+├── utils/
+│   └── audioProcessor.ts     # 音频处理核心逻辑
+├── App.vue                    # 主应用组件
+├── main.ts                    # 应用入口
+├── style.css                  # 全局样式
+└── vite-env.d.ts             # TypeScript 类型声明
 ├── index.html                     # HTML 入口
 ├── package.json                   # 项目配置
 ├── tsconfig.json                  # TypeScript 配置
