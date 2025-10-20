@@ -93,9 +93,10 @@ npm run preview
 
 src/
 ├── components/
-└── AudioConverter.vue    # 文件转换进度组件
+│   └──AudioConverter.vue    # 文件转换进度组件
 ├── utils/
 │   └── audioProcessor.ts     # 音频处理核心逻辑
+│   └── batchDownloader.ts    # 批量下载核心逻辑
 ├── App.vue                    # 主应用组件
 ├── main.ts                    # 应用入口
 ├── style.css                  # 全局样式
