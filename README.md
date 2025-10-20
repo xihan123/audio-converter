@@ -90,7 +90,6 @@ npm run preview
 ## 🔧 项目结构
 
 ```
-audio-to-wav/
 ├── src/
 │   ├── components/
 │   │   └── AudioConverter.vue    # 文件转换进度组件
