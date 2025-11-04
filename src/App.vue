@@ -49,14 +49,19 @@ const handleDrop = async (e: DragEvent) => {
   processFiles(allFiles)
 }
 
+const isAudioFile = (file: File): boolean => {
+  const audioExtensions = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.wma', '.opus', '.webm', '.oga']
+  const fileName = file.name.toLowerCase()
+  return audioExtensions.some(ext => fileName.endsWith(ext)) || file.type.startsWith('audio/')
+}
+
 const traverseFileTree = async (entry: any, fileList: File[]): Promise<void> => {
   if (entry.isFile) {
     const file = await new Promise<File>((resolve) => {
       entry.file((file: File) => resolve(file))
     })
 
-    // 只处理音频文件
-    if (file.type.startsWith('audio/')) {
+    if (isAudioFile(file)) {
       fileList.push(file)
     }
   } else if (entry.isDirectory) {
@@ -74,7 +79,8 @@ const traverseFileTree = async (entry: any, fileList: File[]): Promise<void> => 
 const handleFileInput = (e: Event) => {
   const target = e.target as HTMLInputElement
   if (target.files) {
-    processFiles(Array.from(target.files))
+    const audioFiles = Array.from(target.files).filter(isAudioFile)
+    processFiles(audioFiles)
   }
 }
 
