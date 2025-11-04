@@ -66,11 +66,21 @@ const traverseFileTree = async (entry: any, fileList: File[]): Promise<void> => 
     }
   } else if (entry.isDirectory) {
     const reader = entry.createReader()
-    const entries = await new Promise<any[]>((resolve) => {
+    const allEntries: any[] = []
+    
+    // readEntries 需要循环调用直到返回空数组
+    let entries = await new Promise<any[]>((resolve) => {
       reader.readEntries((entries: any[]) => resolve(entries))
     })
+    
+    while (entries.length > 0) {
+      allEntries.push(...entries)
+      entries = await new Promise<any[]>((resolve) => {
+        reader.readEntries((entries: any[]) => resolve(entries))
+      })
+    }
 
-    for (const childEntry of entries) {
+    for (const childEntry of allEntries) {
       await traverseFileTree(childEntry, fileList)
     }
   }
